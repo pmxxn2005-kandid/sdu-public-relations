@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {spawn, execFileSync} from 'node:child_process';
-import {mkdirSync, rmSync, existsSync, copyFileSync, writeFileSync} from 'node:fs';
+import {mkdirSync, rmSync, existsSync, copyFileSync, writeFileSync, readFileSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
@@ -59,6 +59,14 @@ try{
   const anonymous=await browser.newContext();const anon=await anonymous.request.get(base+'/files/2');check(anon.status()===404,'unpublished upload hidden from anonymous');await anonymous.close();
   const largeImage=path.join(runtime,'large-image.png');execFileSync('php',['-r','imagepng(imagecreatetruecolor(1000,1000), $argv[1], 0);',largeImage],{cwd:root,env});
   await page.locator('#upload-files').setInputFiles(largeImage);await page.getByRole('button',{name:'อัปโหลด',exact:true}).click();await page.waitForFunction(()=>/^(อัปโหลดไฟล์เรียบร้อย|อัปโหลดเสร็จสิ้น)/.test(document.getElementById('upload-summary').textContent));check(await page.locator('#upload-queue [data-state=success]').count()===1,'valid image larger than default PHP 2 MB limit uploads');
+  const originalJpeg=path.join(runtime,'original-full-size.jpg');execFileSync('php',['-r','imagejpeg(imagecreatetruecolor(3200,1800),$argv[1],96);',originalJpeg],{cwd:root,env});
+  const originalBytes=readFileSync(originalJpeg);
+  const originalUpload=await page.request.post(base+'/admin/media/upload',{multipart:{_token:uploadToken,file:{name:'original-full-size.jpg',mimeType:'image/jpeg',buffer:originalBytes}}});check(originalUpload.status()===201,'full-size JPEG upload succeeds');const originalId=(await originalUpload.json()).id;
+  const downloadOriginal=await page.request.get(base+'/files/'+originalId+'?download=1');check((await downloadOriginal.body()).equals(originalBytes),'download matches original image byte for byte');check(downloadOriginal.headers()['content-type'].includes('image/jpeg')&&downloadOriginal.headers()['content-disposition'].includes('.jpg'),'original download retains JPEG format and filename');
+  const previewSize=await page.evaluate(async id=>{const response=await fetch('/files/'+id);const bitmap=await createImageBitmap(await response.blob());return [bitmap.width,bitmap.height];},originalId);check(previewSize[0]===2000&&previewSize[1]===1125,'page uses smaller preview while original remains 3200px');
+  const originalAnon=await browser.newContext();check((await originalAnon.request.get(base+'/files/'+originalId+'?download=1')).status()===404,'private original download denied to anonymous visitors');await originalAnon.close();
+  const originalPaths=JSON.parse(execFileSync('php',['-r',`require 'app/bootstrap.php';echo json_encode(one('SELECT m.path AS preview,o.path AS original FROM media m JOIN media_originals o ON o.media_id=m.id WHERE m.id=?',[${originalId}]));`],{cwd:root,env}).toString());
+  await page.request.post(base+'/admin/media',{form:{_token:uploadToken,action:'delete',id:String(originalId)}});check(!existsSync(path.join(root,'storage/uploads',originalPaths.original))&&!existsSync(path.join(root,'storage/uploads',originalPaths.preview)),'deleting unused image removes both original and preview');
   const folderPath=path.join(runtime,'folder-upload');rmSync(folderPath,{recursive:true,force:true});mkdirSync(path.join(folderPath,'nested'),{recursive:true});
   for(let n=0;n<21;n++)copyFileSync(path.join(root,'public/assets/campus.webp'),path.join(folderPath,`photo-${n}.webp`));
   copyFileSync(path.join(root,'public/assets/campus.webp'),path.join(folderPath,'same.webp'));copyFileSync(path.join(root,'public/assets/campus.webp'),path.join(folderPath,'nested/same.webp'));

@@ -94,17 +94,40 @@ function upload_media(array $file, string $alt, int $userId): int {
     if (!$ext) throw new InvalidArgumentException('รองรับ JPG, PNG, WebP และ PDF เท่านั้น');
     if ($mime === 'application/pdf' && file_get_contents($file['tmp_name'], false, null, 0, 5) !== '%PDF-') throw new InvalidArgumentException('ไฟล์ PDF ไม่ถูกต้อง');
     $path = bin2hex(random_bytes(20)) . '.' . $ext;
-    if (str_starts_with($mime, 'image/')) {
-        $info = getimagesize($file['tmp_name']); if (!$info || $info[0] * $info[1] > 24000000) throw new InvalidArgumentException('ภาพต้องไม่เกิน 24 ล้านพิกเซล');
-        $im = match($mime) { 'image/jpeg'=>imagecreatefromjpeg($file['tmp_name']), 'image/png'=>imagecreatefrompng($file['tmp_name']), default=>imagecreatefromwebp($file['tmp_name']) };
-        if (!$im) throw new InvalidArgumentException('อ่านภาพไม่สำเร็จ');
-        $scale = min(1, 2000 / max($info[0], $info[1]));
-        if ($scale < 1) { $scaled = imagescale($im, (int)round($info[0] * $scale), (int)round($info[1] * $scale)); $im = $scaled; }
-        $path = bin2hex(random_bytes(20)) . '.webp'; imagewebp($im, ROOT . '/storage/uploads/' . $path, 85); unset($im); $mime = 'image/webp';
-    } elseif (!move_uploaded_file($file['tmp_name'], ROOT . '/storage/uploads/' . $path)) throw new RuntimeException('บันทึกไฟล์ไม่สำเร็จ');
-    $name = mb_substr(basename((string)$file['name']), 0, 250);
-    query('INSERT INTO media (name, path, mime, size, alt, uploaded_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)', [$name, $path, $mime, filesize(ROOT . '/storage/uploads/' . $path), mb_substr($alt, 0, 500), $userId, now()]);
-    $id = (int)db()->lastInsertId(); audit('upload', 'media', $id); return $id;
+    $created=[];$original=null;
+    try {
+        if (str_starts_with($mime, 'image/')) {
+            $info = getimagesize($file['tmp_name']); if (!$info || $info[0] * $info[1] > 24000000) throw new InvalidArgumentException('ภาพต้องไม่เกิน 24 ล้านพิกเซล');
+            $im = match($mime) { 'image/jpeg'=>imagecreatefromjpeg($file['tmp_name']), 'image/png'=>imagecreatefrompng($file['tmp_name']), default=>imagecreatefromwebp($file['tmp_name']) };
+            if (!$im) throw new InvalidArgumentException('อ่านภาพไม่สำเร็จ');
+            $originalPath=bin2hex(random_bytes(20)).'.'.$ext;
+            $original=['path'=>$originalPath,'mime'=>$mime,'size'=>filesize($file['tmp_name']),'sha256'=>hash_file('sha256',$file['tmp_name'])];
+            if(!move_uploaded_file($file['tmp_name'],ROOT.'/storage/uploads/'.$originalPath)) throw new RuntimeException('บันทึกภาพต้นฉบับไม่สำเร็จ');
+            $created[]=$originalPath;
+            $scale = min(1, 2000 / max($info[0], $info[1]));
+            if ($scale < 1) {
+                $scaled = imagescale($im, (int)round($info[0] * $scale), (int)round($info[1] * $scale));
+                if(!$scaled) throw new RuntimeException('สร้างภาพตัวอย่างไม่สำเร็จ');
+                $im = $scaled;
+            }
+            $path = bin2hex(random_bytes(20)) . '.webp';$created[]=$path;
+            if(!imagewebp($im, ROOT . '/storage/uploads/' . $path, 85)) throw new RuntimeException('บันทึกภาพตัวอย่างไม่สำเร็จ');
+            unset($im); $mime = 'image/webp';
+        } else {
+            if(!move_uploaded_file($file['tmp_name'], ROOT . '/storage/uploads/' . $path)) throw new RuntimeException('บันทึกไฟล์ไม่สำเร็จ');
+            $created[]=$path;
+        }
+        $name = mb_substr(basename((string)$file['name']), 0, 250);
+        db()->beginTransaction();
+        query('INSERT INTO media (name, path, mime, size, alt, uploaded_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)', [$name, $path, $mime, filesize(ROOT . '/storage/uploads/' . $path), mb_substr($alt, 0, 500), $userId, now()]);
+        $id = (int)db()->lastInsertId();
+        if($original) query('INSERT INTO media_originals (media_id,path,mime,size,sha256) VALUES (?,?,?,?,?)',[$id,$original['path'],$original['mime'],$original['size'],$original['sha256']]);
+        audit('upload', 'media', $id);db()->commit();return $id;
+    } catch(Throwable $ex) {
+        if(db()->inTransaction())db()->rollBack();
+        foreach($created as $saved){$target=ROOT.'/storage/uploads/'.$saved;if(is_file($target))unlink($target);}
+        throw $ex;
+    }
 }
 
 function media_folder_id(array $input): int {

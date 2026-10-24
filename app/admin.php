@@ -91,7 +91,7 @@ if($path==='/admin/media') {
                 require_editor();$id=(int)($_POST['id']??0);$file=one('SELECT * FROM media WHERE id=?',[$id]);
                 if(!$file) throw new InvalidArgumentException('ไม่พบไฟล์');
                 if(one('SELECT id FROM contents WHERE cover_id=? LIMIT 1',[$id])||one('SELECT content_id FROM content_media WHERE media_id=? LIMIT 1',[$id])||one('SELECT id FROM personnel WHERE photo_id=? LIMIT 1',[$id])||(int)setting('hero_media_id')===$id) throw new InvalidArgumentException('ไฟล์นี้ถูกใช้งานอยู่ กรุณาถอดออกจากเนื้อหาก่อนลบ');
-                query('DELETE FROM media WHERE id=?',[$id]);$filename=ROOT.'/storage/uploads/'.basename($file['path']);if(is_file($filename))unlink($filename);audit('delete','media',$id);flash('ลบไฟล์แล้ว');
+                $original=one('SELECT path FROM media_originals WHERE media_id=?',[$id]);query('DELETE FROM media WHERE id=?',[$id]);if($original){$originalFile=ROOT.'/storage/uploads/'.basename($original['path']);if(is_file($originalFile))unlink($originalFile);}$filename=ROOT.'/storage/uploads/'.basename($file['path']);if(is_file($filename))unlink($filename);audit('delete','media',$id);flash('ลบไฟล์แล้ว');
             } elseif(($_POST['action']??'')==='alt') {
                 $id=(int)($_POST['id']??0);$file=one('SELECT * FROM media WHERE id=?',[$id]);if(!$file)abort(404);if($u['role']==='author'&&(int)$file['uploaded_by']!==(int)$u['id'])abort(403);
                 query('UPDATE media SET alt=? WHERE id=?',[mb_substr(trim((string)($_POST['alt']??'')),0,500),$id]);audit('update','media',$id);flash('ปรับปรุงคำอธิบายภาพแล้ว');

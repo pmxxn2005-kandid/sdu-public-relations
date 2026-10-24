@@ -10,6 +10,10 @@ try {
         $file = one('SELECT * FROM media WHERE id = ?', [(int)$m[1]]); if (!$file) abort(404);
         $public = one('SELECT c.id FROM contents c LEFT JOIN content_media cm ON cm.content_id = c.id WHERE (c.cover_id = ? OR cm.media_id = ?) AND ' . public_clause() . ' LIMIT 1', [$file['id'], $file['id'], now()]) || one('SELECT id FROM personnel WHERE photo_id = ? AND published = 1 LIMIT 1', [$file['id']]) || (int)setting('hero_media_id') === (int)$file['id'];
         if (!$public && !current_user()) abort(404);
+        if(isset($_GET['download'])) {
+            $original=one('SELECT path,mime,size FROM media_originals WHERE media_id=?',[$file['id']]);
+            if($original){$file['path']=$original['path'];$file['mime']=$original['mime'];$file['size']=$original['size'];}
+        }
         $filename = ROOT . '/storage/uploads/' . basename($file['path']); if (!is_file($filename)) abort(404, 'ไม่พบไฟล์ที่ต้องการ');
         header('Content-Type: ' . $file['mime']); header('Content-Length: ' . filesize($filename));
         header('Cache-Control: private, no-store');

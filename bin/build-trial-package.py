@@ -22,7 +22,7 @@ index=(root/'public/index.php').read_text().replace("dirname(__DIR__) . '/app/bo
 (private/'.env').write_text((root/'deploy/infinityfree.env.example').read_text().replace('ADMIN_PASSWORD=REPLACE_WITH_12_CHAR_PASSWORD','ADMIN_PASSWORD='))
 source=sqlite3.connect(root/'storage/app.sqlite')
 backup=sqlite3.connect(':memory:');source.backup(backup);source.close()
-tables=['users','categories','media','contents','content_media','personnel','settings','revisions','audit_logs','login_attempts','slug_redirects','media_folders','media_folder_items']
+tables=['users','categories','media','contents','content_media','personnel','settings','revisions','audit_logs','login_attempts','slug_redirects','media_folders','media_folder_items','media_originals']
 credentials=out/'trial-admin.txt'
 password=credentials.read_text().split('Password: ',1)[1].strip() if credentials.exists() else secrets.token_hex(6)
 hashcode=subprocess.check_output(['php','-r','$p=stream_get_contents(STDIN);echo password_hash($p,PASSWORD_DEFAULT);'],input=password.encode()).decode()
@@ -44,7 +44,7 @@ sql+=['COMMIT;']
 (out/'database.sql').write_text('\n'.join(sql));os.chmod(out/'database.sql',0o600)
 (out/'trial-admin.txt').write_text('Trial deployment only; local login unchanged\nEmail: '+admin[1]+'\nPassword: '+password+'\n');os.chmod(out/'trial-admin.txt',0o600)
 files=[]
-for (path,) in backup.execute('SELECT path FROM media ORDER BY id'):
+for (path,) in backup.execute('SELECT path FROM media UNION SELECT path FROM media_originals'):
  file=root/'storage/uploads'/Path(path).name
  if not file.is_file():raise RuntimeError('Referenced file missing: '+file.name)
  files.append(file)
