@@ -21,6 +21,13 @@ function content_list(string $type, array $filters = [], int $page = 1, int $siz
     return compact('items', 'count');
 }
 function save_content(array $input, array $u, ?array $old): int {
+    if(isset($input['media_ids_json'])) {
+        try {$ids=json_decode((string)$input['media_ids_json'],true,512,JSON_THROW_ON_ERROR);}catch(JsonException $ex){throw new InvalidArgumentException('รายการไฟล์แนบไม่ถูกต้อง กรุณาเปิดหน้าแก้ไขใหม่');}
+        if(!is_array($ids)||!array_is_list($ids)||count($ids)>1000)throw new InvalidArgumentException('แนบไฟล์ได้สูงสุด 1000 รายการ');
+        foreach($ids as $id)if(!is_int($id)||$id<1)throw new InvalidArgumentException('ไฟล์แนบไม่ถูกต้อง');
+        $input['media_ids']=$ids;
+    }
+
     $type = $old['type'] ?? (string)($input['type'] ?? 'post');
     if (!isset(CONTENT_TYPES[$type])) throw new InvalidArgumentException('ประเภทเนื้อหาไม่ถูกต้อง');
     if ($u['role'] === 'author' && ($type !== 'post' || ($old && !can_edit($old, $u)))) throw new RuntimeException('ไม่มีสิทธิ์แก้ไขเนื้อหานี้');

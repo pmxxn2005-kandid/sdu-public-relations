@@ -77,4 +77,8 @@ check(safe_url("https://example.com/\r\nInjected: value")==='' && safe_url('http
 check(safe_url('https://example.com\\evil')==='','backslash URL rejected');
 $thaiId=save_content(array_merge($linkInput,['slug'=>'thai-external-news','external_url'=>$thaiUrl]),$admin,null);
 check(one('SELECT external_url FROM contents WHERE id=?',[$thaiId])['external_url']===$encodedUrl,'Thai external news saved with valid redirect URL');
+$jsonAlbum=save_content(['type'=>'album','title'=>'JSON 1000 รูป','slug'=>'json-1000','status'=>'draft','media_ids_json'=>json_encode(array_slice($attachmentIds,0,1000))],$admin,null);
+check((int)query('SELECT COUNT(*) FROM content_media WHERE content_id=?',[$jsonAlbum])->fetchColumn()===1000,'compact JSON saves 1000 attachments');
+rejects(fn()=>save_content(['type'=>'album','title'=>'JSON ไม่ถูกต้อง','media_ids_json'=>'{bad}'],$admin,null),'invalid compact attachment data rejected');
+rejects(fn()=>save_content(['type'=>'album','title'=>'JSON เกินจำนวน','media_ids_json'=>json_encode($attachmentIds)],$admin,null),'compact attachment limit enforced');
 echo "\n$passed integration checks passed (isolated SQLite).\n";

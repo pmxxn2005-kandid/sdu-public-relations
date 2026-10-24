@@ -113,6 +113,15 @@
   document.querySelectorAll('[data-confirm]').forEach(button => button.addEventListener('click', ev => { if (!confirm(button.dataset.confirm)) ev.preventDefault(); }));
   document.querySelectorAll('[data-media-selection]').forEach(section => {
     const checkboxes = [...section.querySelectorAll('input[name="media_ids[]"]')];
+    section.closest('form')?.addEventListener('submit', () => {
+      const form=section.closest('form');
+      let field=form.querySelector('input[name=media_ids_json]');
+      if(!field){field=document.createElement('input');field.type='hidden';field.name='media_ids_json';form.append(field);}
+      field.value=JSON.stringify(checkboxes.filter(input=>input.checked).map(input=>Number(input.value)));
+      checkboxes.forEach(input=>{input.disabled=true;});
+    });
+    window.addEventListener('pageshow',()=>checkboxes.forEach(input=>{input.disabled=false;}));
+
     const actions = section.querySelector('.media-selection-actions');
     const count = section.querySelector('[data-selection-count]');
     const folderFilter = section.querySelector('[data-media-folder]');

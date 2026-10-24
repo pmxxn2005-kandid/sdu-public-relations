@@ -4,6 +4,8 @@ import sqlite3, zipfile, json, os, subprocess, secrets, shutil
 root=Path(__file__).resolve().parents[1]
 out=root/'storage/deployment/infinityfree'
 out.mkdir(parents=True,exist_ok=True)
+os.chmod(out,0o700)
+for old in out.glob('photos-*.zip'): old.unlink()
 site=out/'site'
 if site.exists(): shutil.rmtree(site)
 private=site/'_private'
@@ -21,7 +23,8 @@ index=(root/'public/index.php').read_text().replace("dirname(__DIR__) . '/app/bo
 source=sqlite3.connect(root/'storage/app.sqlite')
 backup=sqlite3.connect(':memory:');source.backup(backup);source.close()
 tables=['users','categories','media','contents','content_media','personnel','settings','revisions','audit_logs','login_attempts','slug_redirects','media_folders','media_folder_items']
-password=secrets.token_hex(6)
+credentials=out/'trial-admin.txt'
+password=credentials.read_text().split('Password: ',1)[1].strip() if credentials.exists() else secrets.token_hex(6)
 hashcode=subprocess.check_output(['php','-r','$p=stream_get_contents(STDIN);echo password_hash($p,PASSWORD_DEFAULT);'],input=password.encode()).decode()
 admin=backup.execute("SELECT id,email FROM users WHERE role='admin' AND active=1 ORDER BY id LIMIT 1").fetchone()
 if not admin:raise RuntimeError('No active admin')
@@ -40,9 +43,6 @@ for table in tables:
 sql+=['COMMIT;']
 (out/'database.sql').write_text('\n'.join(sql));os.chmod(out/'database.sql',0o600)
 (out/'trial-admin.txt').write_text('Trial deployment only; local login unchanged\nEmail: '+admin[1]+'\nPassword: '+password+'\n');os.chmod(out/'trial-admin.txt',0o600)
-with zipfile.ZipFile(out/'01-website.zip','w',zipfile.ZIP_DEFLATED) as z:
- for file in site.rglob('*'):
-  if file.is_file():z.write(file,str(file.relative_to(site)))
 files=[]
 for (path,) in backup.execute('SELECT path FROM media ORDER BY id'):
  file=root/'storage/uploads'/Path(path).name
@@ -57,6 +57,17 @@ if batch:batches.append(batch)
 for n,batch in enumerate(batches,1):
  with zipfile.ZipFile(out/f'photos-{n:03}.zip','w',zipfile.ZIP_DEFLATED) as z:
   for file in batch:z.write(file,'_private/storage/uploads/'+file.name)
+# One-time installer is included in upload package only.
+shutil.copyfile(root/'deploy/install.php',site/'install.php')
+shutil.copyfile(out/'database.sql',private/'database.sql')
+(private/'install-manifest.json').write_text(json.dumps({'tables':counts,'media_paths':[file.name for file in files]}))
+tokenFile=out/'install-token.txt'
+setupToken=tokenFile.read_text().strip() if tokenFile.exists() else secrets.token_hex(32)
+tokenFile.write_text(setupToken+'\n');os.chmod(tokenFile,0o600)
+(private/'setup.token').write_text(setupToken);os.chmod(private/'setup.token',0o600)
+with zipfile.ZipFile(out/'01-website.zip','w',zipfile.ZIP_DEFLATED) as z:
+ for file in site.rglob('*'):
+  if file.is_file():z.write(file,str(file.relative_to(site)))
 (out/'manifest.json').write_text(json.dumps({'domain':'sdu-public-relations.rf.gd','tables':counts,'image_archives':len(batches),'files':len(files),'mysql_tested':False},ensure_ascii=False,indent=2))
 for archive in out.glob('*.zip'):
  with zipfile.ZipFile(archive) as z:assert z.testzip() is None

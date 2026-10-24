@@ -19,3 +19,5 @@ __pycache__/
 !.env.example
 
 /.codesight/
+
+/.vercel-safe/
