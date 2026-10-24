@@ -95,7 +95,7 @@
           if (!(response.headers.get('content-type') || '').includes('application/json')) throw new Error('เซิร์ฟเวอร์รับไฟล์ไม่สำเร็จ กรุณาตรวจขนาดไฟล์และลองใหม่');
           const data = await response.json();
           if (!response.ok || !Number.isInteger(data.id)) throw new Error(data.error || 'อัปโหลดไม่สำเร็จ');
-          item.state = 'success'; item.message = '';
+          item.state = 'success'; item.message = data.resolution ? `ต้นฉบับ ${data.resolution.width} × ${data.resolution.height} px · ${data.resolution.is4k ? 'รองรับ 4K' : 'ต้นฉบับต่ำกว่า 4K'}` : '';
         } catch (error) {
           item.state = 'failed'; item.message = error.message || 'การเชื่อมต่อขัดข้อง';
           if (sessionExpired || error instanceof TypeError) { interruption = item.message; stopping = true; }

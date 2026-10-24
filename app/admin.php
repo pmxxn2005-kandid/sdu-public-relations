@@ -16,7 +16,10 @@ if ($path === '/admin/media/upload') {
         $folderId=media_folder_id($_POST);
         $id=upload_media($_FILES['file']??[],trim((string)($_POST['alt']??'')),(int)$u['id']);
         assign_media_folder($id,$folderId);
-        json_response(['id'=>$id,'name'=>one('SELECT name FROM media WHERE id=?',[$id])['name'],'message'=>'อัปโหลดไฟล์เรียบร้อย'],201);
+        $original=one('SELECT path FROM media_originals WHERE media_id=?',[$id]);
+        $dimensions=$original?getimagesize(ROOT.'/storage/uploads/'.basename($original['path'])):false;
+        $resolution=$dimensions?['width'=>$dimensions[0],'height'=>$dimensions[1],'is4k'=>max($dimensions[0],$dimensions[1])>=3840&&min($dimensions[0],$dimensions[1])>=2160]:null;
+        json_response(['id'=>$id,'name'=>one('SELECT name FROM media WHERE id=?',[$id])['name'],'resolution'=>$resolution,'message'=>'อัปโหลดไฟล์เรียบร้อย'],201);
     } catch (InvalidArgumentException $ex) { json_response(['error'=>$ex->getMessage()],422); }
     catch (Throwable $ex) { error_log($ex->__toString()); json_response(['error'=>'บันทึกไฟล์ไม่สำเร็จ กรุณาลองใหม่'],500); }
 }

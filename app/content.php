@@ -104,14 +104,14 @@ function upload_media(array $file, string $alt, int $userId): int {
             $original=['path'=>$originalPath,'mime'=>$mime,'size'=>filesize($file['tmp_name']),'sha256'=>hash_file('sha256',$file['tmp_name'])];
             if(!move_uploaded_file($file['tmp_name'],ROOT.'/storage/uploads/'.$originalPath)) throw new RuntimeException('บันทึกภาพต้นฉบับไม่สำเร็จ');
             $created[]=$originalPath;
-            $scale = min(1, 2000 / max($info[0], $info[1]));
+            $scale = min(1, 3840 / max($info[0], $info[1]));
             if ($scale < 1) {
                 $scaled = imagescale($im, (int)round($info[0] * $scale), (int)round($info[1] * $scale));
                 if(!$scaled) throw new RuntimeException('สร้างภาพตัวอย่างไม่สำเร็จ');
                 $im = $scaled;
             }
             $path = bin2hex(random_bytes(20)) . '.webp';$created[]=$path;
-            if(!imagewebp($im, ROOT . '/storage/uploads/' . $path, 85)) throw new RuntimeException('บันทึกภาพตัวอย่างไม่สำเร็จ');
+            if(!imagewebp($im, ROOT . '/storage/uploads/' . $path, 90)) throw new RuntimeException('บันทึกภาพตัวอย่างไม่สำเร็จ');
             unset($im); $mime = 'image/webp';
         } else {
             if(!move_uploaded_file($file['tmp_name'], ROOT . '/storage/uploads/' . $path)) throw new RuntimeException('บันทึกไฟล์ไม่สำเร็จ');
