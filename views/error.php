@@ -1,0 +1,1 @@
+<section class="container error-page"><p class="eyebrow">SUAN DUSIT · <?= (int)($status??500) ?></p><h1><?= e($title) ?></h1><p>กลับไปหน้าแรก หรือค้นหาข้อมูลที่ต้องการ</p><div class="button-row"><a class="button" href="/">กลับหน้าแรก <?= icon('arrow') ?></a><a class="button secondary" href="/search">ค้นหาข้อมูล</a></div></section>

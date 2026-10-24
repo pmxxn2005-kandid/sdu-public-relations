@@ -1,0 +1,7 @@
+Options -Indexes
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^ index.php [QSA,L]
+<FilesMatch "^(router\.php|\.user\.ini)$">
+Require all denied
+</FilesMatch>

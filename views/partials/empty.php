@@ -1,0 +1,1 @@
+<div class="empty-state"><?= icon('search',36) ?><h3><?= e($emptyTitle ?? 'ยังไม่มีข้อมูลที่เผยแพร่') ?></h3><p><?= e($emptyText ?? 'กรุณาติดตามข้อมูลเพิ่มเติมได้ที่นี่') ?></p><?php if(!empty($emptyLink)): ?><a class="button secondary" href="<?= e($emptyLink) ?>">ล้างตัวกรอง</a><?php endif ?></div>
